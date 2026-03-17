@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:canvas_danmaku/danmaku_controller.dart';
+import 'package:canvas_danmaku/danmaku_screen.dart';
+import 'package:canvas_danmaku/models/danmaku_option.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -51,7 +54,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   String _hintText = '';
   IconData _hintIcon = LucideIcons.play;
   final double _barHeight = 36.0;
-  
+
   // Gesture states
   double _brightness = 0.5;
   bool _isDragging = false;
@@ -62,9 +65,10 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
   String _dragHintType = ''; // 'volume', 'brightness', 'seek'
 
   late SkipConfig _localSkipConfig;
-  
+
   ChewieController? _chewieController;
   VideoPlayerController? _videoPlayerController;
+  late DanmakuController _danmakuController;
 
   @override
   void initState() {
@@ -79,7 +83,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
     if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
       // Desktop brightness handled by window manager or system
     }
-    // For mobile, we'd need a plugin like screen_brightness. 
+    // For mobile, we'd need a plugin like screen_brightness.
     // For now we'll just track it locally for the UI hint.
   }
 
@@ -164,7 +168,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
 
   void _handleKeyEvent(KeyEvent event) {
     if (event is! KeyDownEvent || _videoPlayerController == null) return;
-    
+
     final key = event.logicalKey;
     if (_isLocked && key != LogicalKeyboardKey.keyL) return;
 
@@ -191,13 +195,19 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       final newVol = (_videoPlayerController!.value.volume + 0.1).clamp(0.0, 1.0);
       _videoPlayerController!.setVolume(newVol);
       if (newVol > 0) _lastVolume = newVol;
-      _showActionHint('音量: ${(newVol * 100).toInt()}%', newVol == 0 ? LucideIcons.volumeX : (newVol < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2));
+      _showActionHint(
+        '音量: ${(newVol * 100).toInt()}%',
+        newVol == 0 ? LucideIcons.volumeX : (newVol < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2),
+      );
       _cancelAndRestartTimer();
     } else if (key == LogicalKeyboardKey.arrowDown) {
       final newVol = (_videoPlayerController!.value.volume - 0.1).clamp(0.0, 1.0);
       _videoPlayerController!.setVolume(newVol);
       if (newVol > 0) _lastVolume = newVol;
-      _showActionHint('音量: ${(newVol * 100).toInt()}%', newVol == 0 ? LucideIcons.volumeX : (newVol < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2));
+      _showActionHint(
+        '音量: ${(newVol * 100).toInt()}%',
+        newVol == 0 ? LucideIcons.volumeX : (newVol < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2),
+      );
       _cancelAndRestartTimer();
     } else if (key == LogicalKeyboardKey.keyL) {
       setState(() => _isLocked = !_isLocked);
@@ -254,7 +264,9 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
               children: [
                 if (_latestValue == null || !_latestValue!.isInitialized || _latestValue!.isBuffering)
                   const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
-                
+
+                _buildDanmaku(),
+
                 _buildHitArea(),
 
                 // 中央提示
@@ -265,32 +277,26 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                       duration: const Duration(milliseconds: 200),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(12)),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(_hintIcon, color: Colors.white, size: 32),
                             const SizedBox(height: 8),
-                            Text(_hintText, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                            Text(
+                              _hintText,
+                              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
-                
+
                 if (_showSettings && !_isLocked) _buildSettingsOverlay(),
 
                 if (!_showSettings) ...[
-                  Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: <Widget>[
-                      _buildTopBar(context),
-                      _buildBottomBar(context),
-                    ],
-                  ),
+                  Column(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: <Widget>[_buildTopBar(context), _buildBottomBar(context)]),
                   _buildLockButton(),
                 ],
               ],
@@ -309,15 +315,11 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
         alignment: Alignment.centerLeft,
         child: Padding(
           padding: const EdgeInsets.only(left: 24),
-          child: _buildIconBtn(
-            _isLocked ? LucideIcons.lock : LucideIcons.unlock,
-            () {
-              setState(() => _isLocked = !_isLocked);
-              _showActionHint(_isLocked ? '已上锁' : '已解锁', _isLocked ? LucideIcons.lock : LucideIcons.unlock);
-              _cancelAndRestartTimer();
-            },
-            size: 26,
-          ),
+          child: _buildIconBtn(_isLocked ? LucideIcons.lock : LucideIcons.unlock, () {
+            setState(() => _isLocked = !_isLocked);
+            _showActionHint(_isLocked ? '已上锁' : '已解锁', _isLocked ? LucideIcons.lock : LucideIcons.unlock);
+            _cancelAndRestartTimer();
+          }, size: 26),
         ),
       ),
     );
@@ -366,9 +368,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
                   ),
                 ),
                 const Divider(color: Colors.white12, height: 1),
-                Expanded(
-                  child: _showSpeedSubMenu ? _buildSpeedList() : _buildMainSettingsList(),
-                ),
+                Expanded(child: _showSpeedSubMenu ? _buildSpeedList() : _buildMainSettingsList()),
               ],
             ),
           ),
@@ -391,10 +391,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
           title: '去广告',
           trailing: Transform.scale(
             scale: 0.7,
-            child: ZenSwitch(
-              value: widget.isAdBlockingEnabled,
-              onChanged: (val) => widget.onAdBlockingToggle?.call(),
-            ),
+            child: ZenSwitch(value: widget.isAdBlockingEnabled, onChanged: (val) => widget.onAdBlockingToggle?.call()),
           ),
         ),
         _buildSettingItem(
@@ -404,11 +401,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
             child: ZenSwitch(
               value: _localSkipConfig.enable,
               onChanged: (val) {
-                final newConfig = SkipConfig(
-                  enable: val,
-                  introTime: _localSkipConfig.introTime,
-                  outroTime: _localSkipConfig.outroTime,
-                );
+                final newConfig = SkipConfig(enable: val, introTime: _localSkipConfig.introTime, outroTime: _localSkipConfig.outroTime);
                 setState(() => _localSkipConfig = newConfig);
                 widget.onSkipConfigChange?.call(newConfig);
               },
@@ -421,11 +414,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
           subtitle: _localSkipConfig.introTime > 0 ? '${_localSkipConfig.introTime}s' : '未设置',
           onTap: () {
             final currentPos = _videoPlayerController?.value.position.inSeconds ?? 0;
-            final newConfig = SkipConfig(
-              enable: true,
-              introTime: currentPos,
-              outroTime: _localSkipConfig.outroTime,
-            );
+            final newConfig = SkipConfig(enable: true, introTime: currentPos, outroTime: _localSkipConfig.outroTime);
             setState(() => _localSkipConfig = newConfig);
             widget.onSkipConfigChange?.call(newConfig);
           },
@@ -437,11 +426,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
             final currentPos = _videoPlayerController?.value.position.inSeconds ?? 0;
             final total = _videoPlayerController?.value.duration.inSeconds ?? 0;
             if (total > 0) {
-              final newConfig = SkipConfig(
-                enable: true,
-                introTime: _localSkipConfig.introTime,
-                outroTime: total - currentPos,
-              );
+              final newConfig = SkipConfig(enable: true, introTime: _localSkipConfig.introTime, outroTime: total - currentPos);
               setState(() => _localSkipConfig = newConfig);
               widget.onSkipConfigChange?.call(newConfig);
             }
@@ -566,14 +551,13 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
               children: [
                 if (!_isLocked) ...[
                   if (_videoPlayerController != null) _buildPlayPause(_videoPlayerController!),
-                  if (widget.hasNextEpisode && widget.onNextEpisode != null)
-                    _buildIconBtn(LucideIcons.stepForward, widget.onNextEpisode!),
+                  if (widget.hasNextEpisode && widget.onNextEpisode != null) _buildIconBtn(LucideIcons.stepForward, widget.onNextEpisode!),
                   if (_videoPlayerController != null) _buildVolumeButton(context),
                   const SizedBox(width: 8),
                   _buildPosition(context),
-                  
+
                   const Spacer(),
-                  
+
                   // 右侧组合：[设置] [应用全屏] [桌面全屏]
                   if (!isLive)
                     _buildIconBtn(LucideIcons.settings, () {
@@ -677,12 +661,13 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
 
   void _handleVerticalDragUpdate(DragUpdateDetails details) {
     if (_videoPlayerController == null || _isLocked) return;
-    
+
     final width = MediaQuery.of(context).size.width;
     final delta = -details.primaryDelta! / 200; // 灵敏度调节
-    
+
     _isDragging = true;
-    if (_dragStartOffset.dx < width * 0.35) { // 增加判定范围
+    if (_dragStartOffset.dx < width * 0.35) {
+      // 增加判定范围
       // 左侧：亮度
       _dragHintType = 'brightness';
       _dragStartBrightness = (_dragStartBrightness + delta).clamp(0.0, 1.0);
@@ -694,40 +679,44 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
       _dragStartVolume = (_dragStartVolume + delta).clamp(0.0, 1.0);
       _videoPlayerController!.setVolume(_dragStartVolume);
       if (_dragStartVolume > 0) _lastVolume = _dragStartVolume;
-      _showActionHint('音量: ${(_dragStartVolume * 100).toInt()}%', _dragStartVolume == 0 ? LucideIcons.volumeX : (_dragStartVolume < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2), autoHide: false);
+      _showActionHint(
+        '音量: ${(_dragStartVolume * 100).toInt()}%',
+        _dragStartVolume == 0 ? LucideIcons.volumeX : (_dragStartVolume < 0.5 ? LucideIcons.volume1 : LucideIcons.volume2),
+        autoHide: false,
+      );
     }
   }
 
   void _handleHorizontalDragUpdate(DragUpdateDetails details) {
     if (_videoPlayerController == null || _isLocked) return;
-    
+
     final width = MediaQuery.of(context).size.width;
     final totalDuration = _videoPlayerController!.value.duration;
     if (totalDuration == Duration.zero) return;
 
     final delta = details.primaryDelta! / width * totalDuration.inSeconds * 0.5; // 灵敏度
-    
+
     _isDragging = true;
     _dragHintType = 'seek';
     final newSeconds = (_dragStartPosition.inSeconds + delta).clamp(0.0, totalDuration.inSeconds.toDouble());
     final newPosition = Duration(seconds: newSeconds.toInt());
     _dragStartPosition = newPosition;
-    
+
     final isForward = delta > 0;
     _showActionHint(
-      '进度: ${_formatDuration(newPosition)} / ${_formatDuration(totalDuration)}', 
+      '进度: ${_formatDuration(newPosition)} / ${_formatDuration(totalDuration)}',
       isForward ? LucideIcons.fastForward : LucideIcons.rewind,
-      autoHide: false
+      autoHide: false,
     );
   }
 
   void _handleDragEnd(DragEndDetails details) {
     if (!_isDragging || _isLocked) return;
-    
+
     if (_dragHintType == 'seek' && _videoPlayerController != null) {
       _videoPlayerController!.seekTo(_dragStartPosition);
     }
-    
+
     setState(() {
       _isDragging = false;
       _dragHintType = '';
@@ -817,7 +806,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
 
   Widget _buildProgressBar() {
     if (_videoPlayerController == null) return const SizedBox.shrink();
-    
+
     return MouseRegion(
       onEnter: (_) => setState(() => _isBarHovered = true),
       onExit: (_) => setState(() => _isBarHovered = false),
@@ -828,11 +817,7 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
         child: SliderTheme(
           data: SliderTheme.of(context).copyWith(
             trackHeight: _isBarHovered ? 4.0 : 2.0,
-            thumbShape: RoundSliderThumbShape(
-              enabledThumbRadius: _isBarHovered ? 6.0 : 0.0,
-              elevation: 2,
-              pressedElevation: 4,
-            ),
+            thumbShape: RoundSliderThumbShape(enabledThumbRadius: _isBarHovered ? 6.0 : 0.0, elevation: 2, pressedElevation: 4),
             overlayShape: const RoundSliderOverlayShape(overlayRadius: 10.0),
             activeTrackColor: const Color(0xFF0A84FF),
             inactiveTrackColor: Colors.white.withValues(alpha: 0.2),
@@ -841,18 +826,29 @@ class _ZenVideoControlsState extends State<ZenVideoControls> with WindowListener
           ),
           child: Slider(
             value: _videoPlayerController!.value.position.inMilliseconds.toDouble().clamp(
-              0.0, 
-              _videoPlayerController!.value.duration.inMilliseconds.toDouble()
+              0.0,
+              _videoPlayerController!.value.duration.inMilliseconds.toDouble(),
             ),
             max: _videoPlayerController!.value.duration.inMilliseconds.toDouble(),
-            onChanged: _isLocked ? null : (value) {
-              _videoPlayerController!.seekTo(Duration(milliseconds: value.toInt()));
-            },
+            onChanged: _isLocked
+                ? null
+                : (value) {
+                    _videoPlayerController!.seekTo(Duration(milliseconds: value.toInt()));
+                  },
             onChangeStart: _isLocked ? null : (_) => _hideTimer?.cancel(),
             onChangeEnd: _isLocked ? null : (_) => _cancelAndRestartTimer(),
           ),
         ),
       ),
+    );
+  }
+
+  DanmakuScreen _buildDanmaku() {
+    return DanmakuScreen(
+      createdController: (e) {
+        _danmakuController = e;
+      },
+      option: DanmakuOption(),
     );
   }
 }
@@ -862,11 +858,7 @@ class _HoverableIcon extends StatefulWidget {
   final VoidCallback onTap;
   final double size;
 
-  const _HoverableIcon({
-    required this.icon,
-    required this.onTap,
-    this.size = 18,
-  });
+  const _HoverableIcon({required this.icon, required this.onTap, this.size = 18});
 
   @override
   State<_HoverableIcon> createState() => _HoverableIconState();
@@ -889,11 +881,7 @@ class _HoverableIconState extends State<_HoverableIcon> {
           duration: const Duration(milliseconds: 150),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Icon(
-              widget.icon,
-              color: _isHovered ? Colors.white : Colors.white.withOpacity(0.85),
-              size: widget.size,
-            ),
+            child: Icon(widget.icon, color: _isHovered ? Colors.white : Colors.white.withOpacity(0.85), size: widget.size),
           ),
         ),
       ),

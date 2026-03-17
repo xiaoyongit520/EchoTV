@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:canvas_danmaku/danmaku_controller.dart';
+import 'package:canvas_danmaku/danmaku_screen.dart';
+import 'package:canvas_danmaku/models/danmaku_option.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
@@ -19,7 +22,8 @@ class EchoVideoPlayer extends ConsumerStatefulWidget {
   final Function(SkipConfig)? onSkipConfigChange;
   final VoidCallback? onNextEpisode;
   final bool hasNextEpisode;
-  final Function(Duration position, Duration duration, {bool isFinal})? onProgress;
+  final Function(Duration position, Duration duration, {bool isFinal})?
+  onProgress;
   final VoidCallback? onEnded;
 
   const EchoVideoPlayer({
@@ -41,16 +45,14 @@ class EchoVideoPlayer extends ConsumerStatefulWidget {
   ConsumerState<EchoVideoPlayer> createState() => EchoVideoPlayerState();
 }
 
-class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer>
+    with WidgetsBindingObserver {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   bool _isInitializing = false;
-  bool _isDisposed = false;
+  bool _isLoading = false;
   Timer? _bufferingTimer;
   String? _errorMessage;
-
-  @override
-  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -69,68 +71,61 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
   }
 
   Future<void> _initializePlayer() async {
-    if (_isDisposed) return;
     setState(() {
-      _isInitializing = true;
+      _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final oldVideoController = _videoController;
-      final oldChewieController = _chewieController;
-      
-      _videoController = null;
-      _chewieController = null;
-
-      if (oldChewieController != null) {
-        oldChewieController.dispose();
-      }
-      if (oldVideoController != null) {
-        oldVideoController.removeListener(_videoListener);
-        await oldVideoController.dispose();
-      }
-
-      // 为了确保旧播放器资源完全释放，稍微等一下
-      await Future.delayed(const Duration(milliseconds: 200));
-      if (_isDisposed) return;
+      _chewieController?.dispose();
+      await _videoController?.dispose();
 
       // 1. 判定是否为标准的 M3U8 格式（用于代理服务器处理）
       final isM3u8 = widget.url.toLowerCase().contains('.m3u8');
-      
+
       // 2. 判定是否需要开启去广告代理（仅限点播且是 M3U8）
       final isAdBlockEnabled = ref.read(adBlockEnabledProvider);
       final playUrl = (!widget.isLive && isAdBlockEnabled && isM3u8)
-          ? ref.read(adBlockServiceProvider).getProxyUrl(widget.url, referer: widget.referer)
+          ? ref
+                .read(adBlockServiceProvider)
+                .getProxyUrl(widget.url, referer: widget.referer)
           : widget.url;
 
       // 3. 判定是否给播放器 HLS 格式提示
       bool useHlsHint = isM3u8;
       if (widget.isLive && !isM3u8) {
         final otherExtensions = ['.mp4', '.mov', '.mpd', '.mkv', '.webm'];
-        if (!otherExtensions.any((ext) => widget.url.toLowerCase().contains(ext))) {
-          useHlsHint = true; 
+        if (!otherExtensions.any((ext) => widget.url.toLowerCase().contains(ext),)) {
+          useHlsHint = true;
         }
       }
+      debugPrint('player url: $playUrl');
 
       final controller = VideoPlayerController.networkUrl(
         Uri.parse(playUrl),
         httpHeaders: {
-          'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
-          if (widget.referer != null && widget.referer!.isNotEmpty) 'Referer': widget.referer!,
+          'User-Agent':
+              'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
+          if (widget.referer != null && widget.referer!.isNotEmpty)
+            'Referer': widget.referer!,
         },
         formatHint: useHlsHint ? VideoFormat.hls : null,
       );
-      
+      if(widget.isLive){
+        controller.setLooping(true);
+      }
+
       _videoController = controller;
       await controller.initialize();
-      if (_isDisposed) return;
+      _isInitializing = controller.value.isInitialized;
 
-      // 如果有初始进度，计算跳转位置
+      //如果有初始进度，计算跳转位置
       Duration? startAt;
       if (widget.initialPosition != null && widget.initialPosition! > 0) {
         final seconds = widget.initialPosition!.toInt();
         // 只有当进度小于总时长（或者总时长还未获取到）时才跳转
-        if (controller.value.duration == Duration.zero || seconds < controller.value.duration.inSeconds) {
+        if (controller.value.duration == Duration.zero ||
+            seconds < controller.value.duration.inSeconds) {
           startAt = Duration(seconds: seconds);
           debugPrint('🎬 播放器准备跳转至: ${seconds}s');
         }
@@ -155,7 +150,9 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
           isAdBlockingEnabled: isAdBlockEnabled,
           onAdBlockingToggle: () {
             final currentEnabled = ref.read(adBlockEnabledProvider);
-            ref.read(adBlockEnabledProvider.notifier).setEnabled(!currentEnabled);
+            ref
+                .read(adBlockEnabledProvider.notifier)
+                .setEnabled(!currentEnabled);
           },
           skipConfig: widget.skipConfig ?? SkipConfig(),
           onSkipConfigChange: widget.onSkipConfigChange,
@@ -173,28 +170,38 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
           backgroundColor: Colors.white.withOpacity(0.1),
         ),
       );
+
+      setState(() {
+        _isLoading = false;
+      });
     } catch (e) {
       debugPrint('EchoVideoPlayer error: $e');
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorMessage = 'Failed to initialize video: $e';
+        _isLoading = false;
+      });
+    } finally {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().contains('404') ? '资源不存在 (404)' : '无法加载视频，请检查网络或更换线路';
+          _isInitializing = false;
+          _isLoading = false;
         });
-      }
-    } finally {
-      if (!_isDisposed && mounted) {
-        setState(() => _isInitializing = false);
       }
     }
   }
 
   void _videoListener() {
-    if (_videoController == null || _isDisposed) return;
-    
+    if (_videoController == null) return;
+
     final value = _videoController!.value;
-    
+
     // 监听缓冲状态（通用逻辑）
     if (value.isInitialized && value.isBuffering && !_isInitializing) {
-      _bufferingTimer ??= Timer(const Duration(seconds: 15), () { // 点播宽限到 15s
+      _bufferingTimer ??= Timer(const Duration(seconds: 15), () {
+        // 点播宽限到 15s
         if (mounted && _videoController!.value.isBuffering) {
           setState(() {
             _errorMessage = '网络连接不稳定或资源加载失败';
@@ -218,25 +225,33 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
     // 进度回调 (每秒最多回调一次，且在播放时回调)
     if (widget.onProgress != null && value.isPlaying) {
       final currentPos = value.position;
-      if (_lastProgressSaveTime == null || (currentPos.inSeconds != _lastProgressSaveTime!.inSeconds)) {
+      if (_lastProgressSaveTime == null ||
+          (currentPos.inSeconds != _lastProgressSaveTime!.inSeconds)) {
         widget.onProgress!(currentPos, value.duration, isFinal: false);
         _lastProgressSaveTime = currentPos;
       }
     }
 
     // --- 新增：跳过片头片尾逻辑 ---
-    if (value.isPlaying && widget.skipConfig != null && widget.skipConfig!.enable) {
+    if (value.isPlaying &&
+        widget.skipConfig != null &&
+        widget.skipConfig!.enable) {
       final position = value.position.inSeconds;
       final duration = value.duration.inSeconds;
 
       // 跳过片头
-      if (widget.skipConfig!.introTime > 0 && position < widget.skipConfig!.introTime) {
-        _videoController!.seekTo(Duration(seconds: widget.skipConfig!.introTime));
+      if (widget.skipConfig!.introTime > 0 &&
+          position < widget.skipConfig!.introTime) {
+        _videoController!.seekTo(
+          Duration(seconds: widget.skipConfig!.introTime),
+        );
         debugPrint('🛡️ 已跳过片头: ${widget.skipConfig!.introTime}s');
       }
 
       // 跳过片尾
-      if (widget.skipConfig!.outroTime > 0 && duration > 0 && position > (duration - widget.skipConfig!.outroTime)) {
+      if (widget.skipConfig!.outroTime > 0 &&
+          duration > 0 &&
+          position > (duration - widget.skipConfig!.outroTime)) {
         debugPrint('🛡️ 已触碰片尾: ${widget.skipConfig!.outroTime}s');
         if (widget.onEnded != null) {
           widget.onEnded!();
@@ -247,7 +262,9 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
     }
 
     // 结束回调
-    if (value.position >= value.duration && value.duration > Duration.zero && !value.isPlaying) {
+    if (value.position >= value.duration &&
+        value.duration > Duration.zero &&
+        !value.isPlaying) {
       if (widget.onEnded != null) {
         widget.onEnded!();
       }
@@ -258,10 +275,9 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
 
   @override
   void dispose() {
-    _isDisposed = true;
     _bufferingTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    
+
     // 销毁前保存最后进度
     if (_videoController != null && widget.onProgress != null) {
       final value = _videoController!.value;
@@ -269,7 +285,7 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
         widget.onProgress!(value.position, value.duration, isFinal: true);
       }
     }
-    
+
     _videoController?.removeListener(_videoListener);
     _videoController?.dispose();
     _chewieController?.dispose();
@@ -286,13 +302,18 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-    // 核心修正：监听去广告开关，变化时重新初始化播放器
+    //核心修正：监听去广告开关，变化时重新初始化播放器
     ref.listen(adBlockEnabledProvider, (previous, next) {
       if (previous != next) {
-        _initializePlayer();
+        debugPrint('adBlockEnabledProvider listen: $previous - $next');
       }
     });
+
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.white),
+      );
+    }
 
     if (_errorMessage != null || (_videoController?.value.hasError ?? false)) {
       return Center(
@@ -316,12 +337,13 @@ class EchoVideoPlayerState extends ConsumerState<EchoVideoPlayer> with WidgetsBi
       );
     }
 
-    if (_isInitializing || _chewieController == null || !_videoController!.value.isInitialized) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
-      );
+    final VideoPlayerController? controller = _videoController;
+    if (_chewieController != null && controller!.value.isInitialized) {
+      return Chewie(controller: _chewieController!);
     }
 
-    return Chewie(controller: _chewieController!);
+    return const Center(
+      child: Text('视频未加载', style: TextStyle(color: Colors.white)),
+    );
   }
 }

@@ -67,7 +67,7 @@ class _DoubanSelectorState extends State<DoubanSelector> {
             },
           ),
         ),
-        
+
         // 当选中“全部”时，显示二级下拉组合，否则显示简单的二级行
         if (isAllSelected) ...[
           const SizedBox(height: 16),
@@ -106,7 +106,9 @@ class _DoubanSelectorState extends State<DoubanSelector> {
 
   Widget _buildPCMenuButton(_Category cat) {
     final currentVal = _multiSelections[cat.key] ?? 'all';
-    final currentLabel = cat.options.firstWhere((o) => o.value == currentVal).label;
+    final currentLabel = cat.options
+        .firstWhere((o) => o.value == currentVal)
+        .label;
     final isDefault = currentVal == 'all' || currentVal == 'T';
 
     return PopupMenuButton<String>(
@@ -117,20 +119,29 @@ class _DoubanSelectorState extends State<DoubanSelector> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       onSelected: (val) {
         setState(() => _multiSelections[cat.key] = val);
-        if (widget.onMultiLevelChange != null) widget.onMultiLevelChange!(_multiSelections);
+        if (widget.onMultiLevelChange != null)
+          widget.onMultiLevelChange!(_multiSelections);
       },
-      itemBuilder: (context) => cat.options.map((opt) => PopupMenuItem(
-        value: opt.value,
-        child: Text(opt.label, style: const TextStyle(fontSize: 13)),
-      )).toList(),
+      itemBuilder: (context) => cat.options
+          .map(
+            (opt) => PopupMenuItem(
+              value: opt.value,
+              child: Text(opt.label, style: const TextStyle(fontSize: 13)),
+            ),
+          )
+          .toList(),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isDefault 
+          color: isDefault
               ? Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)
               : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: isDefault ? Colors.transparent : Theme.of(context).colorScheme.primary.withValues(alpha: 0.2)),
+          border: Border.all(
+            color: isDefault
+                ? Colors.transparent
+                : Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -138,13 +149,21 @@ class _DoubanSelectorState extends State<DoubanSelector> {
             Text(
               isDefault ? cat.label : currentLabel,
               style: TextStyle(
-                fontSize: 13, 
+                fontSize: 13,
                 fontWeight: isDefault ? FontWeight.normal : FontWeight.bold,
-                color: isDefault ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.primary,
+                color: isDefault
+                    ? Theme.of(context).colorScheme.secondary
+                    : Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(width: 6),
-            Icon(LucideIcons.chevronDown, size: 14, color: isDefault ? Theme.of(context).colorScheme.secondary : Theme.of(context).colorScheme.primary),
+            Icon(
+              LucideIcons.chevronDown,
+              size: 14,
+              color: isDefault
+                  ? Theme.of(context).colorScheme.secondary
+                  : Theme.of(context).colorScheme.primary,
+            ),
           ],
         ),
       ),
@@ -232,9 +251,20 @@ class _DoubanSelectorState extends State<DoubanSelector> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(LucideIcons.filter, size: 14, color: Theme.of(context).colorScheme.primary),
+            Icon(
+              LucideIcons.filter,
+              size: 14,
+              color: Theme.of(context).colorScheme.primary,
+            ),
             const SizedBox(width: 6),
-            Text('筛选', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+            Text(
+              '筛选',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
           ],
         ),
       ),
@@ -253,7 +283,8 @@ class _DoubanSelectorState extends State<DoubanSelector> {
           onUpdate: (key, val) {
             setDrawerState(() => _multiSelections[key] = val);
             setState(() => _multiSelections[key] = val);
-            if (widget.onMultiLevelChange != null) widget.onMultiLevelChange!(_multiSelections);
+            if (widget.onMultiLevelChange != null)
+              widget.onMultiLevelChange!(_multiSelections);
           },
         ),
       ),
@@ -264,36 +295,196 @@ class _DoubanSelectorState extends State<DoubanSelector> {
   List<Map<String, String>> _getPrimaryOptions() {
     switch (widget.type) {
       case 'movie':
-        return [{'label': '全部', 'value': '全部'}, {'label': '热门', 'value': '热门'}, {'label': '最新', 'value': '最新'}, {'label': '高分', 'value': '豆瓣高分'}, {'label': '冷门', 'value': '冷门佳片'}];
+        return [
+          {'label': '全部', 'value': '全部'},
+          {'label': '热门', 'value': '热门'},
+          {'label': '最新', 'value': '最新'},
+          {'label': '高分', 'value': '豆瓣高分'},
+          {'label': '冷门', 'value': '冷门佳片'},
+        ];
       case 'tv':
       case 'show':
-        return [{'label': '全部', 'value': '全部'}, {'label': '热门', 'value': '最近热门'}];
+        return [
+          {'label': '全部', 'value': '全部'},
+          {'label': '热门', 'value': '最近热门'},
+        ];
       case 'anime':
-        return [{'label': '番剧', 'value': '番剧'}, {'label': '剧场版', 'value': '剧场版'}];
-      default: return [];
+        return [
+          {'label': '番剧', 'value': '番剧'},
+          {'label': '剧场版', 'value': '剧场版'},
+        ];
+      default:
+        return [];
     }
   }
 
   List<Map<String, String>> _getSecondaryOptions() {
     switch (widget.type) {
       case 'movie':
-        return [{'label': '全部', 'value': '全部'}, {'label': '华语', 'value': '华语'}, {'label': '欧美', 'value': '欧美'}, {'label': '韩国', 'value': '韩国'}, {'label': '日本', 'value': '日本'}];
+        return [
+          {'label': '全部', 'value': '全部'},
+          {'label': '华语', 'value': '华语'},
+          {'label': '欧美', 'value': '欧美'},
+          {'label': '韩国', 'value': '韩国'},
+          {'label': '日本', 'value': '日本'},
+        ];
       case 'tv':
-        return [{'label': '全部', 'value': 'tv'}, {'label': '国产', 'value': 'tv_domestic'}, {'label': '欧美', 'value': 'tv_american'}, {'label': '日本', 'value': 'tv_japanese'}, {'label': '韩国', 'value': 'tv_korean'}];
+        return [
+          {'label': '全部', 'value': 'tv'},
+          {'label': '国产', 'value': 'tv_domestic'},
+          {'label': '欧美', 'value': 'tv_american'},
+          {'label': '日本', 'value': 'tv_japanese'},
+          {'label': '韩国', 'value': 'tv_korean'},
+        ];
       case 'show':
-        return [{'label': '全部', 'value': 'show'}, {'label': '国内', 'value': 'show_domestic'}, {'label': '国外', 'value': 'show_foreign'}];
-      default: return [];
+        return [
+          {'label': '全部', 'value': 'show'},
+          {'label': '国内', 'value': 'show_domestic'},
+          {'label': '国外', 'value': 'show_foreign'},
+        ];
+      default:
+        return [];
     }
   }
 
   List<_Category> _getMultiLevelCategories() {
     final categories = <_Category>[];
     if (widget.type == 'movie' || widget.type == 'tv') {
-      categories.add(_Category(key: 'type', label: '类型', options: [_Option(label: '全部', value: 'all'), _Option(label: '喜剧', value: '喜剧'), _Option(label: '爱情', value: '爱情'), _Option(label: '动作', value: '动作'), _Option(label: '科幻', value: '科幻'), _Option(label: '悬疑', value: '悬疑')]));
+      categories.add(
+        _Category(
+          key: 'type',
+          label: '类型',
+          options: [
+            _Option(label: '全部', value: 'all'),
+            _Option(label: '喜剧', value: '喜剧'),
+            _Option(label: '爱情', value: '爱情'),
+            _Option(label: '悬疑', value: '悬疑'),
+            _Option(label: '动画', value: '动画'),
+            _Option(label: '武侠', value: '武侠'),
+            _Option(label: '古装', value: '古装'),
+            _Option(label: '家庭', value: '家庭'),
+            _Option(label: '犯罪', value: '犯罪'),
+            _Option(label: '科幻', value: '科幻'),
+            _Option(label: '恐怖', value: '恐怖'),
+            _Option(label: '历史', value: '历史'),
+            _Option(label: '战争', value: '战争'),
+            _Option(label: '动作', value: '动作'),
+            _Option(label: '冒险', value: '冒险'),
+            _Option(label: '传记', value: '传记'),
+            _Option(label: '剧情', value: '剧情'),
+            _Option(label: '奇幻', value: '奇幻'),
+            _Option(label: '惊悚', value: '惊悚'),
+            _Option(label: '灾难', value: '灾难'),
+            _Option(label: '歌舞', value: '歌舞'),
+            _Option(label: '音乐', value: '音乐'),
+
+          ],
+        ),
+      );
+    }else if(widget.type == 'show'){
+      categories.add(
+          _Category(
+            key: 'type',
+            label: '类型',
+            options: [
+              _Option(label: '全部', value: 'all'),
+              _Option(label: '真人秀', value: '真人秀'),
+              _Option(label: '脱口秀', value: '脱口秀'),
+              _Option(label: '音乐', value: '音乐'),
+              _Option(label: '舞蹈', value: '舞蹈'),
+            ],
+          ),
+      );
     }
-    categories.add(_Category(key: 'region', label: '地区', options: [_Option(label: '全部', value: 'all'), _Option(label: '华语', value: '华语'), _Option(label: '欧美', value: '欧美'), _Option(label: '韩国', value: '韩国'), _Option(label: '日本', value: '日本')]));
-    categories.add(_Category(key: 'year', label: '年代', options: [_Option(label: '全部', value: 'all'), _Option(label: '2025', value: '2025'), _Option(label: '2024', value: '2024'), _Option(label: '2023', value: '2023'), _Option(label: '2022', value: '2022')]));
-    categories.add(_Category(key: 'sort', label: '排序', options: [_Option(label: '综合', value: 'T'), _Option(label: '热度', value: 'U'), _Option(label: '评分', value: 'S')]));
+    categories.add(
+      _Category(
+        key: 'region',
+        label: '地区',
+        options: [
+          _Option(label: '全部', value: 'all'),
+          _Option(label: '华语', value: '华语'),
+          _Option(label: '欧美', value: '欧美'),
+          _Option(label: '国外', value: '国外'),
+          _Option(label: '韩国', value: '韩国'),
+          _Option(label: '日本', value: '日本'),
+          _Option(label: '中国大陆', value: '中国大陆'),
+          _Option(label: '中国香港', value: '中国香港'),
+          _Option(label: '美国', value: '美国'),
+          _Option(label: '英国', value: '英国'),
+          _Option(label: '泰国', value: '泰国'),
+          _Option(label: '中国台湾', value: '中国台湾'),
+          _Option(label: '意大利', value: '意大利'),
+          _Option(label: '法国', value: '法国'),
+          _Option(label: '德国', value: '德国'),
+          _Option(label: '西班牙', value: '西班牙'),
+          _Option(label: '俄罗斯', value: '俄罗斯'),
+          _Option(label: '瑞典', value: '瑞典'),
+          _Option(label: '巴西', value: '巴西'),
+          _Option(label: '丹麦', value: '丹麦'),
+          _Option(label: '印度', value: '印度'),
+          _Option(label: '加拿大', value: '加拿大'),
+          _Option(label: '爱尔兰', value: '爱尔兰'),
+          _Option(label: '澳大利亚', value: '澳大利亚'),
+        ],
+      ),
+    );
+    categories.add(
+      _Category(
+        key: 'year',
+        label: '年代',
+        options: [
+          _Option(label: '全部', value: 'all'),
+          _Option(label: '2020年代', value: '2020年代'),
+          _Option(label: '2026', value: '2026'),
+          _Option(label: '2025', value: '2025'),
+          _Option(label: '2024', value: '2024'),
+          _Option(label: '2023', value: '2023'),
+          _Option(label: '2022', value: '2022'),
+          _Option(label: '2021', value: '2021'),
+          _Option(label: '2020', value: '2020'),
+          _Option(label: '2019', value: '2019'),
+          _Option(label: '2010年代', value: '2010年代'),
+          _Option(label: '2000年代', value: '2000年代'),
+          _Option(label: '90年代', value: '2000年代'),
+          _Option(label: '80年代', value: '80年代'),
+          _Option(label: '70年代', value: '70年代'),
+          _Option(label: '60年代', value: '60年代'),
+          _Option(label: '更早', value: '更早'),
+        ],
+      ),
+    );
+    categories.add(
+      _Category(
+        key: 'platform',
+        label: '平台',
+        options: [
+          _Option(label: '全部', value: 'all'),
+          _Option(label: '腾讯视频', value: '腾讯视频'),
+          _Option(label: '爱奇艺', value: '爱奇艺'),
+          _Option(label: '优酷', value: '优酷'),
+          _Option(label: '湖南卫视', value: '湖南卫视'),
+          _Option(label: 'Netflix', value: 'Netflix'),
+          _Option(label: 'HBO', value: 'HBO'),
+          _Option(label: 'BBC', value: 'BBC'),
+          _Option(label: 'NHK', value: 'NHK'),
+          _Option(label: 'CBS', value: 'CBS'),
+          _Option(label: 'NBC', value: 'NBC'),
+          _Option(label: 'tvN', value: 'tvN'),
+        ],
+      ),
+    );
+    categories.add(
+      _Category(
+        key: 'sort',
+        label: '排序',
+        options: [
+          _Option(label: '综合排序', value: 'T'),
+          _Option(label: '近期热度', value: 'U'),
+          _Option(label: '高分优先', value: 'S'),
+          _Option(label: '首播时间', value: 'R'),
+        ],
+      ),
+    );
     return categories;
   }
 }
@@ -303,7 +494,11 @@ class _FilterChip extends StatelessWidget {
   final bool isActive;
   final VoidCallback onTap;
 
-  const _FilterChip({required this.label, required this.isActive, required this.onTap});
+  const _FilterChip({
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -316,7 +511,9 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14),
         height: 32,
         decoration: BoxDecoration(
-          color: isActive ? theme.colorScheme.primary : theme.colorScheme.onSurface.withValues(alpha: 0.05),
+          color: isActive
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
@@ -324,7 +521,11 @@ class _FilterChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-            color: isActive ? (theme.brightness == Brightness.dark ? Colors.black : Colors.white) : theme.colorScheme.onSurface.withValues(alpha: 0.7),
+            color: isActive
+                ? (theme.brightness == Brightness.dark
+                      ? Colors.black
+                      : Colors.white)
+                : theme.colorScheme.onSurface.withValues(alpha: 0.7),
           ),
         ),
       ),
@@ -337,13 +538,20 @@ class _MobileFilterDrawer extends StatelessWidget {
   final Map<String, String> selections;
   final Function(String, String) onUpdate;
 
-  const _MobileFilterDrawer({required this.categories, required this.selections, required this.onUpdate});
+  const _MobileFilterDrawer({
+    required this.categories,
+    required this.selections,
+    required this.onUpdate,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      decoration: BoxDecoration(color: theme.colorScheme.surface, borderRadius: const BorderRadius.vertical(top: Radius.circular(32))),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -352,8 +560,16 @@ class _MobileFilterDrawer extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('高级筛选', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(LucideIcons.x, size: 20)),
+              Text(
+                '高级筛选',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(LucideIcons.x, size: 20),
+              ),
             ],
           ),
           const SizedBox(height: 24),
@@ -366,14 +582,26 @@ class _MobileFilterDrawer extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(cat.label, style: TextStyle(color: theme.colorScheme.secondary, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                        Text(
+                          cat.label,
+                          style: TextStyle(
+                            color: theme.colorScheme.secondary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 10,
                           runSpacing: 10,
                           children: cat.options.map((opt) {
                             final isActive = selections[cat.key] == opt.value;
-                            return _FilterChip(label: opt.label, isActive: isActive, onTap: () => onUpdate(cat.key, opt.value));
+                            return _FilterChip(
+                              label: opt.label,
+                              isActive: isActive,
+                              onTap: () => onUpdate(cat.key, opt.value),
+                            );
                           }).toList(),
                         ),
                       ],
@@ -390,12 +618,19 @@ class _MobileFilterDrawer extends StatelessWidget {
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: theme.colorScheme.primary,
-                foregroundColor: theme.brightness == Brightness.dark ? Colors.black : Colors.white,
+                foregroundColor: theme.brightness == Brightness.dark
+                    ? Colors.black
+                    : Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 elevation: 0,
               ),
-              child: const Text('应用筛选', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              child: const Text(
+                '应用筛选',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
             ),
           ),
           const SizedBox(height: 16),
@@ -409,11 +644,13 @@ class _Category {
   final String key;
   final String label;
   final List<_Option> options;
+
   _Category({required this.key, required this.label, required this.options});
 }
 
 class _Option {
   final String label;
   final String value;
+
   _Option({required this.label, required this.value});
 }

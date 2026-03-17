@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:device_preview/device_preview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_player_media_kit/video_player_media_kit.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'core/theme.dart';
@@ -22,13 +24,17 @@ import 'widgets/zen_ui.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+  VideoPlayerMediaKit.ensureInitialized(
+    macOS: true,
+    windows: true,
+    linux: true,
+  );
   if (!kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
     await windowManager.ensureInitialized();
     WindowOptions windowOptions = const WindowOptions(
       size: Size(1280, 720),
       center: true,
-      backgroundColor: Colors.transparent,
+      // backgroundColor: Colors.transparent,
       skipTaskbar: false,
       titleBarStyle: TitleBarStyle.normal,
     );
@@ -41,7 +47,7 @@ void main() async {
 
     // 初始化系统托盘（仅 Windows 和 Linux）
     if (Platform.isWindows || Platform.isLinux) {
-      await trayManager.setIcon('assets/icon/app_icon.png');
+      await trayManager.setIcon('assets/icon/app_icon.ico');
       final Menu menu = Menu(
         items: [
           MenuItem(
@@ -67,7 +73,14 @@ void main() async {
   runApp(
     UncontrolledProviderScope(
       container: container,
-      child: const EchoTVApp(),
+      child:DevicePreview(
+        enabled: true,
+        tools: const [
+          ...DevicePreview.defaultTools,
+        ],
+        builder: (context) => const EchoTVApp(),
+      ),
+
     ),
   );
 }
